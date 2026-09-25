@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from pydantic import Field
 
 
 class Disponibilidade(str, Enum):
@@ -17,4 +17,4 @@ class Volunteer(BaseModel):
     cargo_pretendido: str
     disponibilidade: Disponibilidade
     active: bool = True
-    created_at: datetime = datetime.now()
+    created_at: datetime = Field(default_factory=datetime.now)

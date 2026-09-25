@@ -1,15 +1,11 @@
 from fastapi.testclient import TestClient
 from main import app
-from crud import db  # <--- AGORA SIM: Importando do crud.py
+from crud import reset_database
 
 client = TestClient(app)
 
 def setup_function():
-    # Limpa o banco antes de cada teste
-    db.clear()
-    # Reseta o ID
-    import crud
-    crud.current_id = 1
+    reset_database()
 
 def test_criar_voluntario_valido():
     payload = {
