@@ -28,7 +28,11 @@ Certifique-se de ter o [Poetry](https://python-poetry.org/docs/) instalado.
 
    ReDoc: http://127.0.0.1:8000/redoc
 
-4. **🧪 Como Testar**
+## 📚 Documentação da API
+
+A referência completa dos endpoints, modelos, filtros, exemplos e códigos HTTP está em [`docs/API.md`](docs/API.md). A documentação interativa fica disponível em `/docs` e `/redoc` quando o servidor está em execução.
+
+## 🧪 Como Testar
 O projeto inclui testes automatizados para garantir a integridade dos dados.
 poetry run pytest
 
