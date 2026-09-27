@@ -1,13 +1,14 @@
-from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from enum import Enum
-from pydantic import Field
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class Disponibilidade(str, Enum):
     MANHA = "manha"
     TARDE = "tarde"
     NOITE = "noite"
+
 
 class Volunteer(BaseModel):
     id: int

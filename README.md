@@ -42,5 +42,5 @@ poetry run pytest
 | POST   | `/voluntarios`      | Cadastra um novo voluntário (validação de e-mail único) |
 | GET    | `/voluntarios`      | Lista voluntários (filtros por cargo e disponibilidade) |
 | GET    | `/voluntarios/{id}` | Obtém detalhes de um voluntário específico              |
-| PUT    | `/voluntarios/{id}` | Atualiza os dados de um voluntário                      |
+| PUT    | `/voluntarios/{id}` | Atualiza os dados de um voluntário (valida e-mail único) |
 | DELETE | `/voluntarios/{id}` | Remove um voluntário (soft delete)                      |

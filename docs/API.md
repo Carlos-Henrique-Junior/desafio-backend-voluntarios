@@ -23,6 +23,12 @@ Documentação funcional da API REST para cadastro e gerenciamento de voluntári
 
 Valores permitidos para `disponibilidade`: `manha`, `tarde` ou `noite`.
 
+Regras de validação dos campos:
+
+- `name` e `cargo_pretendido`: 1 a 100 caracteres.
+- `telefone`: 10 ou 11 dígitos numéricos.
+- `email`: formato válido e exclusivo entre voluntários ativos (a comparação ignora maiúsculas).
+
 ## Endpoints
 
 ### GET `/`
@@ -37,7 +43,7 @@ Resposta `200`:
 
 ### POST `/voluntarios`
 
-Cadastra um voluntário. O e-mail deve ser válido.
+Cadastra um voluntário. O e-mail deve ser válido e não pode pertencer a outro voluntário ativo; caso pertença, retorna `400`.
 
 ```bash
 curl -X POST http://localhost:8001/voluntarios \
@@ -72,7 +78,7 @@ Consulta um voluntário pelo identificador.
 
 ### PUT `/voluntarios/{vol_id}`
 
-Atualiza os dados completos do voluntário. Use o mesmo corpo do POST.
+Atualiza os dados completos do voluntário. Use o mesmo corpo do POST. O e-mail informado não pode pertencer a outro voluntário ativo (`400`).
 
 ### DELETE `/voluntarios/{vol_id}`
 
@@ -83,6 +89,7 @@ Realiza a exclusão lógica do voluntário. O registro deixa de aparecer na list
 - `200`: consulta ou atualização concluída.
 - `201`: voluntário criado.
 - `204`: exclusão lógica concluída sem corpo de resposta.
+- `400`: e-mail já registrado por outro voluntário ativo.
 - `404`: voluntário não encontrado.
 - `422`: e-mail, enum ou corpo inválido.
 - `500`: erro interno; investigar logs do serviço.

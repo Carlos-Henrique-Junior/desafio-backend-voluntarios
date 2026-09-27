@@ -1,8 +1,14 @@
 from fastapi import FastAPI, HTTPException
-from typing import Optional
+
+from crud import (
+    create_volunteer,
+    delete_volunteer,
+    get_volunteer,
+    list_volunteers,
+    update_volunteer,
+)
+from models import Disponibilidade, Volunteer
 from schemas import VolunteerCreate
-from models import Disponibilidade
-from crud import create_volunteer, list_volunteers, get_volunteer, delete_volunteer, update_volunteer
 
 app = FastAPI(title="Sistema de Gerenciamento de Voluntários")
 
@@ -10,25 +16,25 @@ app = FastAPI(title="Sistema de Gerenciamento de Voluntários")
 def read_root():
     return {"message": "API funcionando!"}
 
-@app.post("/voluntarios", status_code=201)
+@app.post("/voluntarios", status_code=201, response_model=Volunteer)
 def create(v: VolunteerCreate):
     return create_volunteer(v)
 
-@app.get("/voluntarios")
+@app.get("/voluntarios", response_model=list[Volunteer])
 def list_all(
-    disponibilidade: Optional[Disponibilidade] = None,
-    cargo: Optional[str] = None
+    disponibilidade: Disponibilidade | None = None,
+    cargo: str | None = None
 ):
     return list_volunteers(disponibilidade, cargo)
 
-@app.get("/voluntarios/{vol_id}")
+@app.get("/voluntarios/{vol_id}", response_model=Volunteer)
 def get_one(vol_id: int):
     volunteer = get_volunteer(vol_id)
     if not volunteer:
         raise HTTPException(status_code=404, detail="Voluntário não encontrado")
     return volunteer
 
-@app.put("/voluntarios/{vol_id}")
+@app.put("/voluntarios/{vol_id}", response_model=Volunteer)
 def update(vol_id: int, v: VolunteerCreate):
     updated_volunteer = update_volunteer(vol_id, v)
     if not updated_volunteer:
