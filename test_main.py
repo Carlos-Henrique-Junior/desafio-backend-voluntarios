@@ -4,10 +4,15 @@ from fastapi.testclient import TestClient
 from main import create_app
 
 
+TEST_API_TOKEN = "test-only-volunteer-api-token"
+
+
 @pytest.fixture
 def client(tmp_path):
     database_url = f"sqlite:///{tmp_path / 'test.db'}"
-    with TestClient(create_app(database_url)) as test_client:
+    app = create_app(database_url, api_token=TEST_API_TOKEN)
+    headers = {"Authorization": f"Bearer {TEST_API_TOKEN}"}
+    with TestClient(app, headers=headers) as test_client:
         yield test_client
 
 

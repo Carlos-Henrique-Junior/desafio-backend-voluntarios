@@ -9,6 +9,19 @@ Documentação funcional da API REST para cadastro e gerenciamento de voluntári
 - ReDoc: `http://localhost:8001/redoc`
 - OpenAPI: `http://localhost:8001/openapi.json`
 
+## Autenticação
+
+Todas as rotas `/voluntarios` exigem o cabeçalho `Authorization: Bearer <VOLUNTEER_API_TOKEN>`. Configure o token como segredo no ambiente da aplicação; sem ele, a aplicação falha ao iniciar. O `GET /` é um health check público e não retorna dados pessoais.
+
+Exemplo local sem revelar o token:
+
+```bash
+curl http://localhost:8001/voluntarios \
+  -H "Authorization: Bearer $VOLUNTEER_API_TOKEN"
+```
+
+O token é compartilhado e dá acesso administrativo a todos os registros. Não o coloque em aplicações de navegador, repositórios, logs ou mensagens.
+
 ## Modelo de dados
 
 ```json
@@ -90,6 +103,7 @@ Realiza a exclusão lógica do voluntário. O registro deixa de aparecer na list
 - `201`: voluntário criado.
 - `204`: exclusão lógica concluída sem corpo de resposta.
 - `400`: e-mail já registrado por outro voluntário ativo.
+- `401`: token Bearer ausente ou inválido.
 - `404`: voluntário não encontrado.
 - `422`: e-mail, enum ou corpo inválido.
 - `500`: erro interno; investigar logs do serviço.
@@ -109,4 +123,6 @@ poetry run pytest -q
 
 ## Segurança e operação
 
-Esta API ainda não implementa autenticação/autorização e suas rotas retornam nome, e-mail e telefone. Mantenha-a local e não a publique nem use dados reais até definir controle de acesso, consentimento, retenção e atendimento aos direitos dos titulares. Mantenha `DATABASE_URL` fora do repositório; antes de publicar, configure CORS com origens explícitas, HTTPS, rate limiting e headers de segurança.
+As rotas CRUD agora exigem um único token Bearer administrativo; não há contas individuais, papéis ou cadastro público. Qualquer pessoa com o token pode acessar todos os registros. Mantenha `DATABASE_URL` e `VOLUNTEER_API_TOKEN` fora do repositório e configure-os como segredos na plataforma.
+
+Isso ainda não é uma implementação completa de LGPD. Antes de usar dados reais ou publicar o backend, defina e implemente base legal e consentimento versionado, retenção e eliminação, solicitações dos titulares (acesso, correção, exclusão e revogação), aviso de privacidade e contato responsável. Também configure HTTPS, origens CORS explícitas, rate limiting, backups criptografados e proteção de logs.
