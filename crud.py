@@ -1,90 +1,130 @@
-from datetime import datetime
-
 from fastapi import HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
+from db_models import VolunteerRecord
 from models import Disponibilidade, Volunteer
 from schemas import VolunteerCreate
 
-# Simulação de banco de dados em memória
-db: list[Volunteer] = []
-current_id = 1
 
-
-def reset_database() -> None:
-    """Reset the in-memory store for tests and local development."""
-    global current_id
-    db.clear()
-    current_id = 1
-
-
-def _email_in_use(email: str, exclude_id: int | None = None) -> bool:
-    """Check whether an active volunteer already uses the given email."""
-    normalized = email.lower()
-    return any(
-        v.active and v.id != exclude_id and v.email.lower() == normalized
-        for v in db
+def _to_api_model(record: VolunteerRecord) -> Volunteer:
+    return Volunteer(
+        id=record.id,
+        name=record.name,
+        email=record.email,
+        telefone=record.telefone,
+        cargo_pretendido=record.cargo_pretendido,
+        disponibilidade=Disponibilidade(record.disponibilidade),
+        active=record.active,
+        created_at=record.created_at,
     )
 
 
-def create_volunteer(volunteer_in: VolunteerCreate) -> Volunteer:
-    global current_id
+def _email_in_use(
+    db: Session,
+    email: str,
+    exclude_id: int | None = None,
+) -> bool:
+    statement = select(VolunteerRecord.id).where(
+        VolunteerRecord.active.is_(True),
+        func.lower(VolunteerRecord.email) == email.lower(),
+    )
+    if exclude_id is not None:
+        statement = statement.where(VolunteerRecord.id != exclude_id)
+    return db.scalar(statement.limit(1)) is not None
 
-    # Validação: Verificar se o email já existe e está ativo
-    if _email_in_use(volunteer_in.email):
+
+def _commit_or_raise_email_conflict(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email já registado.") from error
+
+
+def create_volunteer(db: Session, volunteer_in: VolunteerCreate) -> Volunteer:
+    if _email_in_use(db, volunteer_in.email):
         raise HTTPException(status_code=400, detail="Email já registado.")
 
-    # Cria o novo voluntário com os dados recebidos
-    new_volunteer = Volunteer(
-        id=current_id,
+    record = VolunteerRecord(
         name=volunteer_in.name,
         email=volunteer_in.email,
         telefone=volunteer_in.telefone,
         cargo_pretendido=volunteer_in.cargo_pretendido,
-        disponibilidade=volunteer_in.disponibilidade,
+        disponibilidade=volunteer_in.disponibilidade.value,
         active=True,
-        created_at=datetime.now()
     )
-
-    db.append(new_volunteer)
-    current_id += 1
-    return new_volunteer
+    db.add(record)
+    _commit_or_raise_email_conflict(db)
+    db.refresh(record)
+    return _to_api_model(record)
 
 
 def list_volunteers(
+    db: Session,
     disponibilidade: Disponibilidade | None = None,
     cargo: str | None = None,
 ) -> list[Volunteer]:
-    return [
-        volunteer for volunteer in db
-        if volunteer.active
-        and (disponibilidade is None or volunteer.disponibilidade == disponibilidade)
-        and (cargo is None or volunteer.cargo_pretendido == cargo)
-    ]
+    statement = select(VolunteerRecord).where(VolunteerRecord.active.is_(True))
+    if disponibilidade is not None:
+        statement = statement.where(
+            VolunteerRecord.disponibilidade == disponibilidade.value
+        )
+    if cargo is not None:
+        statement = statement.where(VolunteerRecord.cargo_pretendido == cargo)
+    records = db.scalars(statement.order_by(VolunteerRecord.id)).all()
+    return [_to_api_model(record) for record in records]
 
 
-def get_volunteer(vol_id: int) -> Volunteer | None:
-    return next((v for v in db if v.id == vol_id and v.active), None)
+def get_volunteer(db: Session, vol_id: int) -> Volunteer | None:
+    record = db.scalar(
+        select(VolunteerRecord).where(
+            VolunteerRecord.id == vol_id,
+            VolunteerRecord.active.is_(True),
+        )
+    )
+    return _to_api_model(record) if record is not None else None
 
 
-def update_volunteer(vol_id: int, volunteer_in: VolunteerCreate) -> Volunteer | None:
-    volunteer = get_volunteer(vol_id)
-    if volunteer is None:
+def update_volunteer(
+    db: Session,
+    vol_id: int,
+    volunteer_in: VolunteerCreate,
+) -> Volunteer | None:
+    record = db.scalar(
+        select(VolunteerRecord).where(
+            VolunteerRecord.id == vol_id,
+            VolunteerRecord.active.is_(True),
+        )
+    )
+    if record is None:
         return None
 
-    if _email_in_use(volunteer_in.email, exclude_id=vol_id):
+    if _email_in_use(db, volunteer_in.email, exclude_id=vol_id):
         raise HTTPException(status_code=400, detail="Email já registado.")
 
-    volunteer.name = volunteer_in.name
-    volunteer.email = volunteer_in.email
-    volunteer.telefone = volunteer_in.telefone
-    volunteer.cargo_pretendido = volunteer_in.cargo_pretendido
-    volunteer.disponibilidade = volunteer_in.disponibilidade
-    return volunteer
+    record.name = volunteer_in.name
+    record.email = volunteer_in.email
+    record.telefone = volunteer_in.telefone
+    record.cargo_pretendido = volunteer_in.cargo_pretendido
+    record.disponibilidade = volunteer_in.disponibilidade.value
+    _commit_or_raise_email_conflict(db)
+    db.refresh(record)
+    return _to_api_model(record)
 
 
-def delete_volunteer(vol_id: int) -> Volunteer | None:
-    volunteer = get_volunteer(vol_id)
-    if volunteer is None:
+def delete_volunteer(db: Session, vol_id: int) -> Volunteer | None:
+    record = db.scalar(
+        select(VolunteerRecord).where(
+            VolunteerRecord.id == vol_id,
+            VolunteerRecord.active.is_(True),
+        )
+    )
+    if record is None:
         return None
-    volunteer.active = False  # Soft delete
-    return volunteer
+
+    record.active = False
+    db.commit()
+    db.refresh(record)
+    return _to_api_model(record)

@@ -109,4 +109,4 @@ poetry run pytest -q
 
 ## Segurança e operação
 
-Valide todos os dados no servidor, mantenha os segredos fora do repositório, configure CORS com origens explícitas e adicione HTTPS, rate limiting e headers de segurança antes de publicar a API na internet.
+Esta API ainda não implementa autenticação/autorização e suas rotas retornam nome, e-mail e telefone. Mantenha-a local e não a publique nem use dados reais até definir controle de acesso, consentimento, retenção e atendimento aos direitos dos titulares. Mantenha `DATABASE_URL` fora do repositório; antes de publicar, configure CORS com origens explícitas, HTTPS, rate limiting e headers de segurança.

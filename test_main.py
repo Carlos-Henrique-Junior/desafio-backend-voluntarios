@@ -1,11 +1,15 @@
+import pytest
 from fastapi.testclient import TestClient
-from main import app
-from crud import reset_database
 
-client = TestClient(app)
+from main import create_app
 
-def setup_function():
-    reset_database()
+
+@pytest.fixture
+def client(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'test.db'}"
+    with TestClient(create_app(database_url)) as test_client:
+        yield test_client
+
 
 def payload_base(**overrides):
     payload = {
@@ -13,47 +17,36 @@ def payload_base(**overrides):
         "email": "teste@exemplo.com",
         "telefone": "11999999999",
         "cargo_pretendido": "Analista de Dados",
-        "disponibilidade": "manha"
+        "disponibilidade": "manha",
     }
     payload.update(overrides)
     return payload
 
-def test_criar_voluntario_valido():
-    payload = {
-        "name": "Tester Silva",
-        "email": "teste@exemplo.com",
-        "telefone": "11999999999",
-        "cargo_pretendido": "Analista de Dados",
-        "disponibilidade": "manha"
-    }
-    response = client.post("/voluntarios", json=payload)
+
+def test_criar_voluntario_valido(client):
+    response = client.post("/voluntarios", json=payload_base())
     assert response.status_code == 201
     data = response.json()
     assert data["email"] == "teste@exemplo.com"
 
-def test_nao_permitir_email_duplicado():
-    payload = {
-        "name": "Tester Duplicado",
-        "email": "duplicado@exemplo.com",
-        "telefone": "11999999999",
-        "cargo_pretendido": "QA",
-        "disponibilidade": "tarde"
-    }
-    # Cria o primeiro
+
+def test_nao_permitir_email_duplicado(client):
+    payload = payload_base(email="duplicado@exemplo.com", cargo_pretendido="QA", disponibilidade="tarde")
     client.post("/voluntarios", json=payload)
-    
-    # Tenta criar o segundo igual
+
     response = client.post("/voluntarios", json=payload)
-    
+
     assert response.status_code == 400
     assert response.json()["detail"] == "Email já registado."
 
-def test_email_duplicado_ignora_maiusculas():
+
+def test_email_duplicado_ignora_maiusculas(client):
     client.post("/voluntarios", json=payload_base())
     response = client.post("/voluntarios", json=payload_base(email="TESTE@exemplo.com"))
     assert response.status_code == 400
 
-def test_campos_invalidos_retorna_422():
+
+def test_campos_invalidos_retorna_422(client):
     response = client.post("/voluntarios", json=payload_base(name=""))
     assert response.status_code == 422
 
@@ -63,16 +56,22 @@ def test_campos_invalidos_retorna_422():
     response = client.post("/voluntarios", json=payload_base(disponibilidade="integral"))
     assert response.status_code == 422
 
-def test_get_voluntario_inexistente_retorna_404():
+
+def test_get_voluntario_inexistente_retorna_404(client):
     response = client.get("/voluntarios/999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Voluntário não encontrado"
 
-def test_listar_com_filtros():
+
+def test_listar_com_filtros(client):
     client.post("/voluntarios", json=payload_base())
     client.post(
         "/voluntarios",
-        json=payload_base(email="outro@exemplo.com", cargo_pretendido="QA", disponibilidade="tarde"),
+        json=payload_base(
+            email="outro@exemplo.com",
+            cargo_pretendido="QA",
+            disponibilidade="tarde",
+        ),
     )
 
     response = client.get("/voluntarios", params={"disponibilidade": "manha"})
@@ -85,7 +84,8 @@ def test_listar_com_filtros():
     response = client.get("/voluntarios", params={"disponibilidade": "tarde", "cargo": "QA"})
     assert [v["email"] for v in response.json()] == ["outro@exemplo.com"]
 
-def test_atualizar_voluntario():
+
+def test_atualizar_voluntario(client):
     created = client.post("/voluntarios", json=payload_base()).json()
 
     response = client.put(
@@ -99,7 +99,8 @@ def test_atualizar_voluntario():
     assert data["cargo_pretendido"] == "QA"
     assert data["created_at"] == created["created_at"]
 
-def test_atualizar_proprio_email_permitido():
+
+def test_atualizar_proprio_email_permitido(client):
     created = client.post("/voluntarios", json=payload_base()).json()
 
     response = client.put(
@@ -108,7 +109,8 @@ def test_atualizar_proprio_email_permitido():
     )
     assert response.status_code == 200
 
-def test_atualizar_email_duplicado_retorna_400():
+
+def test_atualizar_email_duplicado_retorna_400(client):
     client.post("/voluntarios", json=payload_base())
     other = client.post("/voluntarios", json=payload_base(email="outro@exemplo.com")).json()
 
@@ -119,7 +121,8 @@ def test_atualizar_email_duplicado_retorna_400():
     assert response.status_code == 400
     assert response.json()["detail"] == "Email já registado."
 
-def test_remover_voluntario():
+
+def test_remover_voluntario(client):
     created = client.post("/voluntarios", json=payload_base()).json()
 
     response = client.delete(f"/voluntarios/{created['id']}")
@@ -130,7 +133,8 @@ def test_remover_voluntario():
     assert client.put(f"/voluntarios/{created['id']}", json=payload_base()).status_code == 404
     assert client.delete(f"/voluntarios/{created['id']}").status_code == 404
 
-def test_email_deletado_pode_ser_reutilizado():
+
+def test_email_deletado_pode_ser_reutilizado(client):
     created = client.post("/voluntarios", json=payload_base(email="reuso@exemplo.com")).json()
     client.delete(f"/voluntarios/{created['id']}")
 
